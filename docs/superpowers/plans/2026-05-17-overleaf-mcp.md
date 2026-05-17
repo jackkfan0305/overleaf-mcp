@@ -56,6 +56,7 @@ overleaf-mcp/
 
 | Tool | Description |
 |------|-------------|
+| `list_files` | List all .tex (and optionally .bib) files in the project so Claude knows what to target |
 | `scan_pattern` | Search all .tex files for an environment or regex and return matches with file + line |
 | `apply_rule` | Apply a transformation rule to all matches, storing diffs in pending changes |
 | `preview_changes` | Show unified diff of all pending changes |
@@ -1653,6 +1654,79 @@ npm test -- tests/tools/consistency.test.ts
 ```bash
 git add src/tools/consistency.ts tests/tools/consistency.test.ts
 git commit -m "feat: add consistency_report tool (labels + notation checks)"
+```
+
+---
+
+## Task 13b: `list_files` Tool Handler
+
+**Files:**
+- Create: `src/tools/list-files.ts`
+
+Exposes `WorkspaceManager.listTexFiles()` (and optionally `.bib` files) as an MCP tool so Claude can discover the project structure before targeting specific files.
+
+- [ ] **Step 1: Write `src/tools/list-files.ts`**
+
+```typescript
+import { z } from 'zod'
+import type { WorkspaceManager } from '../git/workspace.js'
+import path from 'node:path'
+
+export const ListFilesInput = z.object({
+  includeBib: z.boolean().default(false),
+})
+export type ListFilesInput = z.infer<typeof ListFilesInput>
+
+export interface ListFilesResult {
+  files: string[]
+  total: number
+}
+
+export function handleListFiles(
+  workspace: WorkspaceManager,
+  input: ListFilesInput = { includeBib: false }
+): ListFilesResult {
+  const parsed = ListFilesInput.parse(input)
+  const files = workspace.listTexFiles()
+  const result = parsed.includeBib
+    ? [...files, ...workspace.listFilesByExtension('.bib')]
+    : files
+  return { files: result, total: result.length }
+}
+```
+
+- [ ] **Step 2: Add `listFilesByExtension` to `WorkspaceManager`**
+
+In `src/git/workspace.ts`, add alongside `listTexFiles`:
+
+```typescript
+listFilesByExtension(ext: string): string[] {
+  return this.walkDir(this.root)
+    .filter(f => f.endsWith(ext))
+    .map(f => path.relative(this.root, f))
+}
+```
+
+- [ ] **Step 3: Register in `src/index.ts`**
+
+```typescript
+server.tool(
+  'list_files',
+  'List all .tex files in the project (and optionally .bib files). Call this first so you know what files exist before targeting specific ones.',
+  { includeBib: z.boolean().optional() },
+  async ({ includeBib, projectName }) => {
+    const { workspace } = await getContext(projectName)
+    const result = handleListFiles(workspace, { includeBib: includeBib ?? false })
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+```
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add src/tools/list-files.ts src/git/workspace.ts src/index.ts
+git commit -m "feat: add list_files tool for project file discovery"
 ```
 
 ---
