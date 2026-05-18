@@ -64,6 +64,8 @@ export interface FilePatch {
 export interface PendingChanges {
   projectName: string
   patches: FilePatch[]
+  /** Latest pending patch per file. Use this for merge/apply semantics. */
+  patchesByFile: Record<string, FilePatch>
   /** Human-readable summary of what the rule did */
   summary: string
 }

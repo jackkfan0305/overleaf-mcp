@@ -40,6 +40,54 @@ describe('LatexParser', () => {
       const cites = parser.extractEnvironments(fixture('multi.tex'), 'multi.tex', 'cite')
       expect(cites.map(c => c.content)).toContain('smith2020')
     })
+
+    it('extracts command content with nested braces', () => {
+      const envs = new LatexParser().extractEnvironments(
+        '\\caption{Accuracy of \\textbf{Model A}}',
+        'main.tex',
+        'caption'
+      )
+      expect(envs).toHaveLength(1)
+      expect(envs[0].content).toBe('Accuracy of \\textbf{Model A}')
+      expect(envs[0].match.raw).toBe('\\caption{Accuracy of \\textbf{Model A}}')
+    })
+
+    it('extracts multiline captions with optional arguments', () => {
+      const envs = new LatexParser().extractEnvironments(
+        '\\caption[Short]{Long caption\nwith detail}',
+        'main.tex',
+        'caption'
+      )
+      expect(envs).toHaveLength(1)
+      expect(envs[0].content).toBe('Long caption\nwith detail')
+    })
+
+    it('extracts cite variants as citations', () => {
+      const envs = new LatexParser().extractEnvironments(
+        'See \\citep{smith2020} and \\citet{jones2021}.',
+        'main.tex',
+        'cite'
+      )
+      expect(envs.map(env => env.content)).toEqual(['smith2020', 'jones2021'])
+    })
+
+    it('ignores commented commands', () => {
+      const envs = new LatexParser().extractEnvironments(
+        '% \\caption{Ignore me}\n\\caption{Use me}',
+        'main.tex',
+        'caption'
+      )
+      expect(envs.map(env => env.content)).toEqual(['Use me'])
+    })
+
+    it('extracts starred command variants', () => {
+      const envs = new LatexParser().extractEnvironments(
+        '\\section*{Acknowledgments}',
+        'main.tex',
+        'section'
+      )
+      expect(envs.map(env => env.content)).toEqual(['Acknowledgments'])
+    })
   })
 
   describe('lineAt', () => {
