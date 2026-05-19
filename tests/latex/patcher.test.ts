@@ -35,6 +35,15 @@ describe('LatexPatcher', () => {
     expect(patch.diff).toBe('')
   })
 
+  it('preserves $$ display math in transformed content', () => {
+    const original = '\\caption{Result where $$x = 1$$}'
+    const patch = patcher.applyTransform(
+      original, 'main.tex', 'caption',
+      (content) => content.endsWith('.') ? content : content + '.'
+    )
+    expect(patch.patched).toBe('\\caption{Result where $$x = 1$$.}')
+  })
+
   it('applies title_case transform to sections', () => {
     const original = '\\section{introduction}\n\\section{methods}'
     const patch = patcher.applyTransform(

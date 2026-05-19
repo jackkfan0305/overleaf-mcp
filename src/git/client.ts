@@ -45,8 +45,8 @@ export class GitClient {
     await simpleGit().clone(this.authRemoteUrl, this.config.localPath)
     try {
       await this.sanitizeRemote()
-    } catch {
-      // best-effort: do not mask the clone result
+    } catch (err) {
+      console.error('failed to sanitize git remote URL after clone; token may be exposed in .git/config', err)
     }
   }
 

@@ -18,7 +18,12 @@ export class LatexPatcher {
     for (const env of [...matches].reverse()) {
       const transformed = transform(env.content)
       if (transformed === env.content) continue
-      const newRaw = env.match.raw.replace(env.content, transformed)
+      // Use replacer function to avoid $-sequence interpretation ($$, $&, $', $`)
+      // and indexOf+slice to handle content appearing more than once in raw
+      const idx = env.match.raw.indexOf(env.content)
+      const newRaw = idx === -1
+        ? env.match.raw.replace(env.content, () => transformed)
+        : env.match.raw.slice(0, idx) + transformed + env.match.raw.slice(idx + env.content.length)
       patched =
         patched.slice(0, env.match.offset) +
         newRaw +
