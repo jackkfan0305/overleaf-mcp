@@ -43,7 +43,11 @@ export class GitClient {
   private async clone(): Promise<void> {
     fs.mkdirSync(path.dirname(this.config.localPath), { recursive: true })
     await simpleGit().clone(this.authRemoteUrl, this.config.localPath)
-    await this.sanitizeRemote()
+    try {
+      await this.sanitizeRemote()
+    } catch {
+      // best-effort: do not mask the clone result
+    }
   }
 
   private async withAuthRemote<T>(operation: () => Promise<T>): Promise<T> {
@@ -51,7 +55,12 @@ export class GitClient {
     try {
       return await operation()
     } finally {
-      await this.sanitizeRemote()
+      try {
+        await this.sanitizeRemote()
+      } catch (err) {
+        // must not replace the operation result or its error
+        console.error('failed to sanitize git remote URL; token may be exposed in .git/config', err)
+      }
     }
   }
 

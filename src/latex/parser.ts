@@ -83,9 +83,14 @@ export class LatexParser {
 
     for (let i = 0; i < content.length; i++) {
       const char = content[i]
-      if (char === '%' && content[i - 1] !== '\\') {
-        i = this.skipComment(content, i)
-        continue
+      if (char === '%') {
+        let backslashes = 0
+        let j = i - 1
+        while (j >= 0 && content[j] === '\\') { backslashes++; j-- }
+        if (backslashes % 2 === 0) {
+          i = this.skipComment(content, i)
+          continue
+        }
       }
       if (char !== '\\') continue
 
