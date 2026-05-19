@@ -124,6 +124,62 @@ describe('handleApplyRule', () => {
     ).rejects.toThrow()
   })
 
+  it('title_case preserves LaTeX commands like \\LaTeX', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'main.tex'),
+      '\\section{introduction to \\LaTeX{} typesetting}\n'
+    )
+    const result = await handleApplyRule(ws, store, 'default', {
+      environment: 'section',
+      rule: 'title_case',
+    })
+    expect(result.matchesChanged).toBe(1)
+    const pending = store.get('default')
+    const patched = pending?.patches[0].patched ?? ''
+    expect(patched).toContain('\\LaTeX{}')
+    expect(patched).not.toContain('\\Latex{}')
+    expect(patched).not.toContain('\\latex{}')
+  })
+
+  it('sentence_case preserves LaTeX commands', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'main.tex'),
+      '\\section{USING \\textbf{bold} AND \\LaTeX}\n'
+    )
+    await handleApplyRule(ws, store, 'default', {
+      environment: 'section',
+      rule: 'sentence_case',
+    })
+    const patched = store.get('default')?.patches[0].patched ?? ''
+    expect(patched).toContain('\\textbf{bold}')
+    expect(patched).toContain('\\LaTeX')
+    expect(patched).not.toContain('\\textbf{Bold}')
+    expect(patched).not.toContain('\\latex')
+  })
+
+  it('uppercase preserves LaTeX commands', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'main.tex'),
+      '\\section{hello \\textit{world}}\n'
+    )
+    await handleApplyRule(ws, store, 'default', {
+      environment: 'section',
+      rule: 'uppercase',
+    })
+    const patched = store.get('default')?.patches[0].patched ?? ''
+    expect(patched).toContain('HELLO')
+    expect(patched).toContain('\\textit{world}')
+    expect(patched).not.toContain('\\TEXTIT')
+  })
+
+  it('matchesChanged only counts actually mutated occurrences', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'main.tex'),
+      '\\caption{Needs period}\n\\caption{Already has one.}\n'
+    )
+    const result = await handleApplyRule(ws, store, 'default', {
+      environment: 'caption',
+      rule: 'ensure_trailing_period',
+    })
+    expect(result.matchesChanged).toBe(1)
+  })
+
   it('reads from pending content when session already has patches for a file', async () => {
     fs.writeFileSync(path.join(tmpDir, 'main.tex'),
       '\\caption{A result}\n\\section{intro}\n'

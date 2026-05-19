@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { EnvironmentName } from '../types.js'
 import { LatexPatcher } from '../latex/patcher.js'
+import { LatexParser } from '../latex/parser.js'
 import type { WorkspaceManager } from '../git/workspace.js'
 import type { SessionStore } from '../session.js'
 
@@ -12,14 +13,43 @@ type RuleName =
   | 'uppercase'
   | 'lowercase'
 
+/**
+ * Split content into LaTeX command spans and plain text spans.
+ * Commands (e.g. \LaTeX{}, \textbf{...}) are preserved verbatim;
+ * only plain-text segments are passed to the case transform.
+ */
+function transformPreservingCommands(
+  content: string,
+  textTransform: (text: string) => string
+): string {
+  // Match backslash-commands with optional braced argument, or $..$ math
+  const commandPattern = /\\[a-zA-Z]+\*?(?:\{[^}]*\})?|\$[^$]+\$/g
+  const parts: string[] = []
+  let lastIndex = 0
+  for (const match of content.matchAll(commandPattern)) {
+    if (match.index > lastIndex) {
+      parts.push(textTransform(content.slice(lastIndex, match.index)))
+    }
+    parts.push(match[0]) // preserve command verbatim
+    lastIndex = match.index + match[0].length
+  }
+  if (lastIndex < content.length) {
+    parts.push(textTransform(content.slice(lastIndex)))
+  }
+  return parts.join('')
+}
+
 const RULES: Record<RuleName, (content: string) => string> = {
   ensure_trailing_period: (s) => s.match(/[.!?]$/) ? s : s + '.',
   remove_trailing_period: (s) => s.replace(/\.$/, ''),
-  title_case: (s) =>
-    s.replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()),
-  sentence_case: (s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase(),
-  uppercase: (s) => s.toUpperCase(),
-  lowercase: (s) => s.toLowerCase(),
+  title_case: (s) => transformPreservingCommands(s, (text) =>
+    text.replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+  ),
+  sentence_case: (s) => transformPreservingCommands(s, (text) =>
+    text.charAt(0).toUpperCase() + text.slice(1).toLowerCase()
+  ),
+  uppercase: (s) => transformPreservingCommands(s, (text) => text.toUpperCase()),
+  lowercase: (s) => transformPreservingCommands(s, (text) => text.toLowerCase()),
 }
 
 const RULE_NAMES = Object.keys(RULES) as [RuleName, ...RuleName[]]
@@ -61,10 +91,11 @@ export async function handleApplyRule(
     const patch = patcher.applyTransform(currentContent, file, parsed.environment, transform)
     if (patch.diff === '') continue
 
-    const envPattern = new RegExp(`\\\\${parsed.environment}\\{`, 'g')
-    const originalMatches = (currentContent.match(envPattern) ?? []).length
+    const parser = new LatexParser()
+    const envs = parser.extractEnvironments(currentContent, file, parsed.environment)
+    const changedCount = envs.filter(env => transform(env.content) !== env.content).length
 
-    matchesChanged += originalMatches
+    matchesChanged += changedCount
     filesChanged++
 
     session.merge(projectName, [{

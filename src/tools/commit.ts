@@ -33,7 +33,15 @@ export async function handleCommitChanges(
   }
 
   const files = pending.patches.map(p => p.file)
-  await git.commitAndPush(files, parsed.message)
+  try {
+    await git.commitAndPush(files, parsed.message)
+  } catch (err) {
+    // Restore original content on disk so workspace stays clean
+    for (const patch of pending.patches) {
+      workspace.writeFile(patch.file, patch.original)
+    }
+    throw err
+  }
   session.clear(parsed.projectName)
 
   return {

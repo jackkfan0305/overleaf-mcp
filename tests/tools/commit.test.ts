@@ -113,5 +113,9 @@ describe('handleCommitChanges', () => {
 
     // Session should still have the pending changes
     expect(store.get('default')).not.toBeNull()
+
+    // Disk should be restored to original content
+    const disk = fs.readFileSync(path.join(tmpDir, 'main.tex'), 'utf8')
+    expect(disk).toBe('\\caption{Original}')
   })
 })
