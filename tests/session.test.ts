@@ -47,6 +47,15 @@ describe('SessionStore', () => {
     expect(result?.summary).toBe('first; second')
   })
 
+  it('initialises session on first merge without a prior set', () => {
+    const patch = { file: 'a.tex', original: 'x', patched: 'X', diff: '' }
+    store.merge('default', [patch], 'init')
+    const result = store.get('default')
+    expect(result?.patches).toHaveLength(1)
+    expect(result?.patchesByFile['a.tex']).toEqual(patch)
+    expect(result?.summary).toBe('init')
+  })
+
   it('keeps one pending patch per file when merging repeated edits', () => {
     const first = {
       file: 'main.tex',

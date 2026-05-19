@@ -48,11 +48,7 @@ export class SessionStore {
   }
 
   private normalize(projectName: string, changes: PendingChanges): PendingChanges {
-    return {
-      ...changes,
-      projectName,
-      patchesByFile: changes.patchesByFile ?? this.indexByFile(changes.patches),
-    }
+    return { ...changes, projectName }
   }
 
   private fromPatches(projectName: string, patches: FilePatch[], summary: string): PendingChanges {

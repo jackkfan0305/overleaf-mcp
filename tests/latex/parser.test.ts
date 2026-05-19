@@ -88,6 +88,25 @@ describe('LatexParser', () => {
       )
       expect(envs.map(env => env.content)).toEqual(['Acknowledgments'])
     })
+
+    it('returns empty array for unclosed brace without throwing', () => {
+      const envs = new LatexParser().extractEnvironments(
+        '\\caption{unclosed',
+        'main.tex',
+        'caption'
+      )
+      expect(envs).toHaveLength(0)
+    })
+
+    it('does not treat \\\\% as a comment start', () => {
+      const envs = new LatexParser().extractEnvironments(
+        '\\caption{100\\\\% accuracy}',
+        'main.tex',
+        'caption'
+      )
+      expect(envs).toHaveLength(1)
+      expect(envs[0].content).toBe('100\\\\% accuracy')
+    })
   })
 
   describe('lineAt', () => {
