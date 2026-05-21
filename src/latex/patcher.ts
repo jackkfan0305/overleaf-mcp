@@ -15,9 +15,11 @@ export class LatexPatcher {
 
     // Apply in reverse order so earlier offsets remain valid
     let patched = original
+    let changedMatches = 0
     for (const env of [...matches].reverse()) {
       const transformed = transform(env.content)
       if (transformed === env.content) continue
+      changedMatches++
       // Use replacer function to avoid $-sequence interpretation ($$, $&, $', $`)
       // and indexOf+slice to handle content appearing more than once in raw
       const idx = env.match.raw.indexOf(env.content)
@@ -35,6 +37,6 @@ export class LatexPatcher {
         ? ''
         : createPatch(file, original, patched, 'original', 'patched')
 
-    return { file, original, patched, diff }
+    return { file, original, patched, diff, changedMatches }
   }
 }

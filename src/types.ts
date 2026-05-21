@@ -57,6 +57,8 @@ export interface FilePatch {
   patched: string
   /** Unified diff string for display */
   diff: string
+  /** Number of matched LaTeX elements whose content changed */
+  changedMatches?: number
 }
 
 // ── Session state ─────────────────────────────────────────────────────────────
