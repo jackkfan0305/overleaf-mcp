@@ -74,9 +74,32 @@ describe('handleApplyRule', () => {
       environment: 'caption',
       rule: 'remove_trailing_period',
     })
-    expect(result.matchesChanged).toBeGreaterThanOrEqual(1)
+    expect(result.matchesChanged).toBe(1)
     const pending = store.get('default')
     expect(pending?.patches[0].patched).toContain('\\caption{Has a period}')
+  })
+
+  it('counts only matches that actually changed', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'main.tex'),
+      '\\caption{Needs period}\n\\caption{Already done.}\n'
+    )
+    const result = await handleApplyRule(ws, store, 'default', {
+      environment: 'caption',
+      rule: 'ensure_trailing_period',
+    })
+    expect(result.matchesChanged).toBe(1)
+  })
+
+  it('preserves LaTeX commands and math when title casing', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'main.tex'),
+      '\\caption{CNN result with \\alpha and $x_i$}\n'
+    )
+    await handleApplyRule(ws, store, 'default', {
+      environment: 'caption',
+      rule: 'title_case',
+    })
+    const pending = store.get('default')
+    expect(pending?.patches[0].patched).toContain('\\caption{CNN Result With \\alpha And $x_i$}')
   })
 
   it('skips files with no changes', async () => {
@@ -178,6 +201,44 @@ describe('handleApplyRule', () => {
       rule: 'ensure_trailing_period',
     })
     expect(result.matchesChanged).toBe(1)
+  })
+
+  it('ensure_trailing_period does not double-punctuate when period is inside a trailing command', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'main.tex'),
+      '\\caption{See \\textbf{Table~1.}}\n'
+    )
+    const result = await handleApplyRule(ws, store, 'default', {
+      environment: 'caption',
+      rule: 'ensure_trailing_period',
+    })
+    expect(result.matchesChanged).toBe(0)
+    expect(result.filesChanged).toBe(0)
+  })
+
+  it('ensure_trailing_period inserts period before trailing braces when needed', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'main.tex'),
+      '\\caption{See \\textbf{Table~1}}\n'
+    )
+    const result = await handleApplyRule(ws, store, 'default', {
+      environment: 'caption',
+      rule: 'ensure_trailing_period',
+    })
+    expect(result.matchesChanged).toBe(1)
+    const patched = store.get('default')?.patches[0].patched ?? ''
+    expect(patched).toContain('\\caption{See \\textbf{Table~1.}}')
+  })
+
+  it('remove_trailing_period strips period inside trailing command braces', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'main.tex'),
+      '\\caption{See \\textbf{Table~1.}}\n'
+    )
+    const result = await handleApplyRule(ws, store, 'default', {
+      environment: 'caption',
+      rule: 'remove_trailing_period',
+    })
+    expect(result.matchesChanged).toBe(1)
+    const patched = store.get('default')?.patches[0].patched ?? ''
+    expect(patched).toContain('\\caption{See \\textbf{Table~1}}')
   })
 
   it('reads from pending content when session already has patches for a file', async () => {

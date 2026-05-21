@@ -1,7 +1,6 @@
 import { z } from 'zod'
 import type { EnvironmentName } from '../types.js'
 import { LatexPatcher } from '../latex/patcher.js'
-import { LatexParser } from '../latex/parser.js'
 import type { WorkspaceManager } from '../git/workspace.js'
 import type { SessionStore } from '../session.js'
 
@@ -40,10 +39,20 @@ function transformPreservingCommands(
 }
 
 const RULES: Record<RuleName, (content: string) => string> = {
-  ensure_trailing_period: (s) => s.match(/[.!?]$/) ? s : s + '.',
-  remove_trailing_period: (s) => s.replace(/\.$/, ''),
+  ensure_trailing_period: (s) => {
+    const inner = s.replace(/\}+$/, '')
+    return inner.match(/[.!?]$/) ? s : inner + '.' + s.slice(inner.length)
+  },
+  remove_trailing_period: (s) => {
+    const inner = s.replace(/\}+$/, '')
+    return inner.replace(/\.$/, '') + s.slice(inner.length)
+  },
   title_case: (s) => transformPreservingCommands(s, (text) =>
-    text.replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    text.replace(/\b[A-Za-z][A-Za-z0-9'-]*\b/g, w =>
+      w === w.toUpperCase() && w.length > 1
+        ? w
+        : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+    )
   ),
   sentence_case: (s) => transformPreservingCommands(s, (text) =>
     text.charAt(0).toUpperCase() + text.slice(1).toLowerCase()
@@ -91,11 +100,7 @@ export async function handleApplyRule(
     const patch = patcher.applyTransform(currentContent, file, parsed.environment, transform)
     if (patch.diff === '') continue
 
-    const parser = new LatexParser()
-    const envs = parser.extractEnvironments(currentContent, file, parsed.environment)
-    const changedCount = envs.filter(env => transform(env.content) !== env.content).length
-
-    matchesChanged += changedCount
+    matchesChanged += patch.changedMatches ?? 0
     filesChanged++
 
     session.merge(projectName, [{
