@@ -4,15 +4,21 @@ import path from 'node:path'
 import type { ProjectConfig } from '../types.js'
 
 export class GitClient {
-  private readonly git: SimpleGit
+  private _git: SimpleGit | undefined
   private readonly authRemoteUrl: string
   private readonly publicRemoteUrl: string
 
   constructor(private readonly config: ProjectConfig) {
-    this.git = simpleGit(config.localPath)
     this.authRemoteUrl =
       `https://git:${config.gitToken}@git.overleaf.com/${config.projectId}`
     this.publicRemoteUrl = `https://git.overleaf.com/${config.projectId}`
+  }
+
+  private get git(): SimpleGit {
+    if (!this._git) {
+      this._git = simpleGit(this.config.localPath)
+    }
+    return this._git
   }
 
   async ensureCloned(): Promise<void> {
